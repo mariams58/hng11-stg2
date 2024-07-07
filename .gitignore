@@ -1,0 +1,7 @@
+.vercel
+*settings.py
+*__pychache__/
+*__init__.py
+venv/
+*.pyc
+accounts/migrations/
