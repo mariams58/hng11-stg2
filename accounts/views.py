@@ -31,11 +31,12 @@ class RegisterView(APIView):
                     "user": serializer.data
                 }
             }, status=status.HTTP_201_CREATED)
-        return Response({
-            "status": "Bad request",
-            "message": "Registration unsuccessful",
-            "statusCode": status.HTTP_400_BAD_REQUEST
-        }, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({
+                "status": "Bad request",
+                "message": "Registration unsuccessful",
+                "statusCode": status.HTTP_400_BAD_REQUEST
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
