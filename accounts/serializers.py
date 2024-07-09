@@ -24,6 +24,16 @@ class UserSerializer(serializers.ModelSerializer):
         if not data['password']:
             raise serializers.ValidationError({"password": "Password is required"})
         return data
+    
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
+    def validate_user_id(self, value):
+        if User.objects.filter(user_id=value).exists():
+            raise serializers.ValidationError("A user with this user ID already exists.")
+        return value
 
     def create(self, validated_data):
         validated_data['password'] = make_password(validated_data['password'])
@@ -34,3 +44,30 @@ class OrganizationSerializer(serializers.ModelSerializer):
         model = Organization
         fields = ['org_id', 'name', 'description', 'users']
 
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        email = data.get('email')
+        password = data.get('password')
+
+        if email and password:
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                raise serializers.ValidationError("Invalid email or password")
+
+            if not user.check_password(password):
+                raise serializers.ValidationError("Invalid email or password")
+
+            data['user'] = user
+        else:
+            raise serializers.ValidationError("Must include 'email' and 'password'")
+        return data
+    
+class AddUserToOrganizationSerializer(serializers.Serializer):
+    user_id = serializers.CharField()
+
+class AddUserToOrganizationSerializer(serializers.Serializer):
+    user_id = serializers.CharField()
