@@ -1,47 +1,39 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-from .models import User, Organization
+from .models import User, Organisation
 from django.contrib.auth.hashers import make_password
 
 class UserSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(
-        validators=[UniqueValidator(queryset=User.objects.all())]
-    )
-    user_id = serializers.CharField(
-        validators=[UniqueValidator(queryset=User.objects.all())]
-    )
-
     class Meta:
         model = User
         fields = ['user_id', 'first_name', 'last_name', 'email', 'phone', 'password']
         extra_kwargs = {'password': {'write_only': True}}
 
-    def validate(self, data):
-        if not data['first_name']:
-            raise serializers.ValidationError({"first_name": "First name is required"})
-        if not data['last_name']:
-            raise serializers.ValidationError({"last_name": "Last name is required"})
-        if not data['password']:
-            raise serializers.ValidationError({"password": "Password is required"})
-        return data
-    
-    def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("A user with this email already exists.")
-        return value
-
-    def validate_user_id(self, value):
-        if User.objects.filter(user_id=value).exists():
-            raise serializers.ValidationError("A user with this user ID already exists.")
-        return value
-
     def create(self, validated_data):
-        validated_data['password'] = make_password(validated_data['password'])
-        return super(UserSerializer, self).create(validated_data)
+        user = User.objects.create_user(
+            email=validated_data['email'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            password=make_password(validated_data['password']),
+            phone=validated_data.get('phone')
+        )
+        return user
+    
+    def validate(self, data):
+        errors = []
+        if not data['first_name']:
+            errors.append({"field": "first_name", "message": "First name is required"})
+        if not data['last_name']:
+            errors.append({"field": "last_name", "message": "Last name is required"})
+        if not data['password']:
+            errors.append({"field": "password", "message": "Password is required"})
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+        return data
 
-class OrganizationSerializer(serializers.ModelSerializer):
+class OrganisationSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Organization
+        model = Organisation
         fields = ['org_id', 'name', 'description', 'users']
 
 class LoginSerializer(serializers.Serializer):

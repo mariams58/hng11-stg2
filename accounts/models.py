@@ -1,8 +1,9 @@
-from django.db import models
-
-# Create your models here.
+# Create your models here
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
+import uuid
 
 class UserManager(BaseUserManager):
     def create_user(self, email, first_name, last_name, password=None, **extra_fields):
@@ -20,13 +21,13 @@ class UserManager(BaseUserManager):
         return self.create_user(email, first_name, last_name, password, **extra_fields)
 
 class User(AbstractBaseUser):
-    user_id = models.CharField(max_length=255, unique=True)
-    first_name = models.CharField(max_length=255, null=False)
-    last_name = models.CharField(max_length=255, null=False)
+    user_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    first_name = models.CharField(max_length=30, null=False)
+    last_name = models.CharField(max_length=30, null=False)
+    password = models.CharField(max_length=128, null=False)
     email = models.EmailField(unique=True, null=False)
-    phone = models.CharField(max_length=255, blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False)
+    phone = models.CharField(max_length=15, validators=[RegexValidator(r'^\d{1,15}$')], blank=True, null=True)
+    
 
     objects = UserManager()
 
@@ -35,12 +36,23 @@ class User(AbstractBaseUser):
 
     def __str__(self):
         return self.email
+    
+    def clean(self):
+        if not self.first_name:
+            raise ValidationError({'first_name': 'This field cannot be null'})
+        if not self.last_name:
+            raise ValidationError({'last_name': 'This field cannot be null'})
+        if not self.email:
+            raise ValidationError({'email': 'This field cannot be null'})
+        if not self.password:
+            raise ValidationError({'password': 'This field cannot be null'})
 
-class Organization(models.Model):
-    org_id = models.CharField(max_length=255, unique=True)
+class Organisation(models.Model):
+    org_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     name = models.CharField(max_length=255, null=False)
     description = models.TextField(blank=True, null=True)
-    users = models.ManyToManyField(User, related_name='organizations')
+    users = models.ManyToManyField(User, related_name='organisations')
 
     def __str__(self):
         return self.name
+    

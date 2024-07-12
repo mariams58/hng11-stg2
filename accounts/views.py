@@ -3,9 +3,10 @@ from rest_framework import status, generics, permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.decorators import api_view
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User, Organization
-from .serializers import UserSerializer, OrganizationSerializer, LoginSerializer, AddUserToOrganizationSerializer
+from .models import User, Organisation
+from .serializers import UserSerializer, OrganisationSerializer, LoginSerializer, AddUserToOrganizationSerializer
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 import jwt, uuid
@@ -19,33 +20,31 @@ def get_current_user(request):
 class RegisterView(APIView):
      def post(self, request):
         data = request.data
-        data['user_id'] = str(uuid.uuid4())  # Generate unique user_id
+        #data['user_id'] = str(uuid.uuid4())  # Generate unique user_id
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            # Create a default organization for the user
-            org_id = str(uuid.uuid4())
-            organization = Organization.objects.create(
-                 org_id=org_id,
-                 name=f"{user.first_name}'s Organisation",
+            # Create a default organization for the user 
+            #org_id = str(uuid.uuid4())
+            org_name = f"{user.first_name}'s Organisation"
+            organisation = Organisation.objects.create(
+                 name=org_name,
                  description=f"Default organization for {user.first_name}"
              )
-             # Generate a JWT token
-            token = jwt.encode({'user_id': user.id}, settings.SECRET_KEY, algorithm='HS256')
+            organisation.users.add(user)
+            organisation.save()
+             # Generate a JWT token 
+            refresh = RefreshToken.for_user(user)
             return Response({
-                 "status": "success",
-                 "message": "Registration successful",
-                 "data": {
-                     "accessToken": token,
-                     "user": serializer.data
-                 }
-             }, status=status.HTTP_201_CREATED)
+                "status": "success",
+                "message": "Registration successful",
+                "data": {
+                    "accessToken":str(refresh.access_token) ,
+                    "user": serializer.data
+                }
+                }, status=status.HTTP_201_CREATED)
         else:
-            return Response({
-                 "status": "Bad request",
-                 "message": "Registration unsuccessful",
-                 "statusCode": status.HTTP_400_BAD_REQUEST
-             }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
         
 class LoginView(APIView):
     serializer_class = LoginSerializer
@@ -54,13 +53,13 @@ class LoginView(APIView):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
-            token = jwt.encode({'user_id': user.id}, settings.SECRET_KEY, algorithm='HS256')
+            refresh = jwt.encode({'user_id': user.id}, settings.SECRET_KEY, algorithm='HS256')
             response_data = {
                 "status": "success",
                 "message": "Login successful",
                 "data": {
-                    "accessToken": token,
-                    "user": {
+                    "accessToken": refresh,
+                    "data": {
                         "user_id": user.user_id,
                         "first_name": user.first_name,
                         "last_name": user.last_name,
@@ -95,7 +94,7 @@ class ListOrganizationsView(APIView):
     def get(self, request):
         user = get_current_user(request)
         organizations = user.organizations.all() | user.created_organizations.all()
-        serializer = OrganizationSerializer(organizations, many=True)
+        serializer = OrganisationSerializer(organizations, many=True)
         return Response({
             "status": "success",
             "message": "Organizations fetched successfully",
@@ -114,15 +113,15 @@ class OrganizationDetailView(APIView):
     def get(self, request, org_id):
         user = get_current_user(request)
         try:
-            organization = Organization.objects.get(org_id=org_id)
-        except Organization.DoesNotExist:
+            organization = Organisation.objects.get(org_id=org_id)
+        except Organisation.DoesNotExist:
             return Response({
                 "status": "Not found",
                 "message": "Organization not found"
             }, status=status.HTTP_404_NOT_FOUND)
         
         if user in organization.users.all() or user == organization.created_by:
-            serializer = OrganizationSerializer(organization)
+            serializer = OrganisationSerializer(organization)
             return Response({
                 "status": "success",
                 "message": "Organization details fetched successfully",
@@ -134,7 +133,7 @@ class OrganizationDetailView(APIView):
         }, status=status.HTTP_400_BAD_REQUEST)
     
 class OrganizationCreateView(APIView):
-    serializer_class = OrganizationSerializer
+    serializer_class = OrganisationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
@@ -158,8 +157,8 @@ class AddUserToOrganizationView(APIView):
         serializer = AddUserToOrganizationSerializer(data=request.data)
         if serializer.is_valid():
             try:
-                organization = Organization.objects.get(org_id=org_id)
-            except Organization.DoesNotExist:
+                organization = Organisation.objects.get(org_id=org_id)
+            except Organisation.DoesNotExist:
                 return Response({
                     "status": "Not found",
                     "message": "Organization not found"
